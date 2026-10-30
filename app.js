@@ -806,6 +806,7 @@ function getImprovements(text, groups) {
 
 function renderAnalysis(analysis, text) {
   const score = analysis.score;
+  const assessment = buildResumeAssessment(analysis, text);
   document.querySelector("#score-value").textContent = score;
   document.querySelector("#score-fill").style.width = `${score}%`;
   document.querySelector("#score-caption").textContent =
@@ -818,6 +819,13 @@ function renderAnalysis(analysis, text) {
     { label: "Impact evidence", value: analysis.metrics.impact, detail: "Numbers and measurable outcomes" },
     { label: targetRole.value ? "Target role match" : "Role match", value: analysis.metrics.roleMatch, detail: targetRole.value || "Across suggested roles" }
   ].map(stat => `<article class="stat-card"><div class="stat-header"><span>${escapeHtml(stat.label)}</span><strong>${stat.value}%</strong></div><div class="stat-track"><span style="width:${stat.value}%"></span></div><p>${escapeHtml(stat.detail)}</p></article>`).join("");
+  document.querySelector("#assessment-title").textContent = assessment.title;
+  document.querySelector("#assessment-badge").textContent = `${score}/100`;
+  document.querySelector("#assessment-summary").textContent = assessment.summary;
+  document.querySelector("#assessment-strengths").innerHTML = assessment.strengths
+    .map(reason => `<li>${escapeHtml(reason)}</li>`).join("");
+  document.querySelector("#assessment-gaps").innerHTML = assessment.gaps
+    .map(reason => `<li>${escapeHtml(reason)}</li>`).join("");
 
   const degree = text.match(/\b(B\.?E\.?|B\.?Tech|Bachelor(?:'s)?|M\.?S\.?|M\.?Tech|Master(?:'s)?|MBA|Computer Science|Information Technology|Engineering)\b/i);
   const degreeText = degree ? degree[0].replace(/\s+/g, " ") : "Emerging professional";
@@ -862,6 +870,41 @@ function renderAnalysis(analysis, text) {
 
   document.querySelector("#improvement-list").innerHTML = analysis.improvements.map(suggestion =>
     `<div class="improvement-item"><span>✦</span><div>${escapeHtml(suggestion)}</div></div>`).join("");
+}
+
+function buildResumeAssessment(analysis, text) {
+  const sectionNames = ["education", "experience", "projects", "skills"];
+  const presentSections = sectionNames.filter(section => new RegExp(`\\b${section}\\b`, "i").test(text));
+  const hasMetrics = /\b\d+%|\b\d+\+?\s*(users|students|customers|records|members|attendees|hours|projects)\b/i.test(text);
+  const hasActionVerbs = /\b(built|created|developed|implemented|analyzed|led|designed|improved|launched|automated|organized)\b/i.test(text);
+  const strengths = [];
+  const gaps = [];
+
+  if (analysis.foundSkills.length) strengths.push(`${analysis.foundSkills.length} specific skill${analysis.foundSkills.length === 1 ? "" : "s"} were identified in your resume.`);
+  if (presentSections.length >= 3) strengths.push(`Recruiters can scan ${presentSections.length} core sections: ${presentSections.join(", ")}.`);
+  if (hasActionVerbs) strengths.push("Your experience includes action-led language that helps show what you did.");
+  if (hasMetrics) strengths.push("Measurable results or scope give readers evidence of your impact.");
+
+  if (presentSections.length < sectionNames.length) {
+    const missingSections = sectionNames.filter(section => !presentSections.includes(section));
+    gaps.push(`Add or clearly label ${missingSections.join(" and ")}${missingSections.length === 1 ? " section" : " sections"} to make your experience easier to scan.`);
+  }
+  if (!hasMetrics) gaps.push("Add real numbers or outcomes where possible so employers can see the scale of your contribution.");
+  if (!hasActionVerbs) gaps.push("Lead bullets with clear action verbs and describe your own contribution.");
+  if (analysis.metrics.roleMatch < 40) {
+    gaps.push(targetRole.value
+      ? `Show more evidence of skills relevant to ${targetRole.value}, using examples from projects or experience.`
+      : "Choose a target role and include more skills and examples that match the work you want to do.");
+  }
+
+  if (!strengths.length) strengths.push("This review gives you a clear starting point; adding specific skills and experience will make your strengths easier to identify.");
+  if (!gaps.length) gaps.push("Keep tailoring the wording and examples to each role, and check that every claim is accurate.");
+
+  const title = analysis.score >= 75 ? "A strong foundation"
+    : analysis.score >= 55 ? "A promising start with room to grow"
+      : "Needs more detail to show your strengths";
+  const summary = `Your ${analysis.score}/100 snapshot: ${title.toLowerCase()}. This assessment is based on the skills, sections, and impact evidence detected in your resume—not a hiring prediction.`;
+  return { title, summary, strengths, gaps };
 }
 
 function renderRoleSkills() {
